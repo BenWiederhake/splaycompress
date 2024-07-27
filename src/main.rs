@@ -1,7 +1,3 @@
-// zig (only on root)
-// zigzig (A/B/C becomes A\B\C)
-// zigzag ("<" becomes "nAn")
-
 mod splay;
 
 use std::mem::size_of;
