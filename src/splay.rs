@@ -381,6 +381,26 @@ mod tests {
     }
 
     #[test]
+    fn test_tree_structure() {
+        let tree = SplayTree::new_uniform();
+        assert_eq!(tree.root, 127);
+        assert_eq!(tree.internal_nodes[0].left, NodeRef::new_leaf(0));
+        assert_eq!(tree.internal_nodes[0].right, NodeRef::new_leaf(1));
+        assert_eq!(tree.internal_nodes[1].left, NodeRef::new_internal(0));
+        assert_eq!(tree.internal_nodes[1].right, NodeRef::new_internal(2));
+        assert_eq!(tree.internal_nodes[2].left, NodeRef::new_leaf(2));
+        assert_eq!(tree.internal_nodes[2].right, NodeRef::new_leaf(3));
+        assert_eq!(tree.internal_nodes[3].left, NodeRef::new_internal(1));
+        assert_eq!(tree.internal_nodes[3].right, NodeRef::new_internal(5));
+        assert_eq!(tree.internal_nodes[4].left, NodeRef::new_leaf(4));
+        assert_eq!(tree.internal_nodes[4].right, NodeRef::new_leaf(5));
+        assert_eq!(tree.internal_nodes[5].left, NodeRef::new_internal(4));
+        assert_eq!(tree.internal_nodes[5].right, NodeRef::new_internal(6));
+        assert_eq!(tree.internal_nodes[6].left, NodeRef::new_leaf(6));
+        assert_eq!(tree.internal_nodes[6].right, NodeRef::new_leaf(7));
+    }
+
+    #[test]
     fn test_go_basic() {
         let mut tree = SplayTree::new_uniform();
         let mut walker = tree.splayable_mut(); // [0, 255]
@@ -640,6 +660,25 @@ mod tests {
             walker.splay_internal();
         }
         assert_eq!(tree.root, 0xe7);
+        assert!(tree.is_consistent());
+    }
+
+    #[test]
+    fn test_splay_leaf() {
+        let mut tree = SplayTree::new_uniform();
+        {
+            let mut walker = tree.splayable_mut(); // [0, 255]
+            walker.go(Direction::Right);
+            walker.go(Direction::Left);
+            walker.go(Direction::Left);
+            walker.go(Direction::Right);
+            walker.go(Direction::Right);
+            walker.go(Direction::Right);
+            walker.go(Direction::Left);
+            walker.go(Direction::Left);
+            walker.splay_parent_of_leaf();
+        }
+        assert_eq!(tree.root, 0b1001_1100);
         assert!(tree.is_consistent());
     }
 }

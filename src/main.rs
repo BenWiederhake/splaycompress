@@ -1,3 +1,4 @@
+mod bits;
 mod splay;
 
 use std::mem::size_of;
