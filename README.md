@@ -2,7 +2,7 @@
 
 This is a simple compression utility, with two purposes:
 - It serves as a proof-of-concept, to demonstrate that Splay Trees (invented by [Robert Tarjan](https://en.wikipedia.org/wiki/Robert_Tarjan)) can be used to compress data reasonably well.
-- It can be used as the compression method, for which I hereby define the `.jan` file extension. If you compress a tarball this way, it would have the [`.tar.jan`](https://en.wikipedia.org/wiki/Robert_Tarjan) file extension.
+- It can be used as a file compression method, for which I hereby define the `.jan` file extension. If you compress a tarball this way, it would have the [`.tar.jan`](https://en.wikipedia.org/wiki/Robert_Tarjan) file extension.
 
 I originally invented all of this as a joke: "It's a `.tar.jan` that uses a `Tarjan`-datastructure, hehe :-)"
 
@@ -40,7 +40,7 @@ splaycompress beats most other compression methods easily, and not just by omitt
 
 ## Install
 
-This software isn't ready for widespread use just yet. However, it's less than 1000 lines of code, it's MIT licensed, so you could just copy it.
+This software isn't ready yet for widespread use. However, it's less than 1000 lines of code, it's MIT licensed, so you could just copy it.
 
 I might make it available through crates.io if there is any demand.
 
@@ -113,13 +113,13 @@ Note that this approach might waste a few bits in the end, which is unavoidable.
 
 ### Why it works
 
-Splay Trees satisfy a surprising variety of optimality theorems, and there are conjectured be behave asymptotically-optimal in some interpretation.
+Splay Trees satisfy a surprising variety of optimality theorems, and they are conjectured to behave asymptotically-optimal in some sense.
 
-In particular, the [Static Optimality Theorem](https://en.wikipedia.org/wiki/Splay_tree#Performance_theorems) can be rephrased like this: The number of pointer dereferences (number of steps going left/right in the tree) during a sequence of element accesses is, in some sense, very close to optimal in terms of the symbol entropy.
+In particular, the [Static Optimality Theorem](https://en.wikipedia.org/wiki/Splay_tree#Performance_theorems) can be rephrased as: The number of pointer dereferences (number of steps going left/right in the tree) during a sequence of element accesses is, in some sense, very close to optimal in terms of symbol entropy.
 
-This means that for all inputs that fall into one of the many classes of sequences for which Splay Trees have been proven to perform exceptionally-well, the above algorithm will emit very few bits, which is exactly what we commonly refer to as "compression".
+This means that for inputs from one of the many classes of sequences for which Splay Trees have been proven to perform exceptionally-well, the above algorithm will emit very few bits, which is exactly what we commonly refer to as "compression".
 
-This means that the compression works exceptionally well for at least the following kinds of behaviors, without even attempting to recognize or special-case these behaviors:
+This means that the compression works exceptionally well for (at least) the following kinds of behaviors, without even attempting to recognize or special-case these patterns:
 - Repeated bytes (not just zeros or 0xFF!)
 - High-entropy bytes from a reasonably-narrow range (even across power-of-two boundaries! This includes ASCII text!)
 - Scan-like sequences, as is often found in indices.
@@ -129,13 +129,11 @@ Most importantly, this compresses short blobs of data unusually well, without fa
 
 ### Why it doesn't work
 
-Because it can never go below 1 bit per byte, i.e. 12.5%, and even that would require incredible amounts of repetition. Here's a comparison how various compression algorithms behave for prefixes of the `src/splay.rs` file as of this commit. Even zooming in on the most advantageous part of this graph, one can clearly see that splaycompress has a steeper increase in filesize than the other algorithms.
+1. Because it can never go below 1 bit per byte, i.e. 12.5%, and even that would require incredible amounts of repetition. Here's a comparison how various compression algorithms behave for prefixes of the `src/splay.rs` file as of this commit. Even zooming in on the most advantageous part of this graph, one can clearly see that splaycompress has a steeper increase in filesize than the other algorithms.
+    ![A comparison of the byte sizes of compressing prefixes of the src/splay.rs file with brotli, bzip2, gzip, lz4, lzma, xz, splaycompress, zlib, and zstd.](meta/comparison.png)
+2. Because it requires incredibly sequential computations and pointer-chasing. My implementation is deliberately local, keeping most of the memory in just a few places. Nevertheless, the way one byte is interpreted completely changes the way the next byte is interpreted, meaning that the throughput is limited by the CPU, with lots of cycles per *bit*.
 
-![A comparison of the byte sizes of compressing prefixes of the src/splay.rs file with brotli, bzip2, gzip, lz4, lzma, xz, splaycompress, zlib, and zstd.](meta/comparison.png)
-
-Because it requires incredibly sequential computations and pointer-chasing. My implementation is deliberately local, keeping most of the memory in just a few places. Nevertheless, the way one byte is interpreted completely changes the way the next byte is interpreted, meaning that the throughput is limited by the CPU, with lots of cycles per *bit*.
-
-Both of these points can be *slightly* improved by using 16-bit words as the basis for everything, but the heightened memory consumption makes this questionable again.
+Both of these points could be *slightly* improved by using 16-bit words as the basis for everything, but the heightened memory consumption makes this questionable again.
 
 This approach won't conquer the world, I know. But still, it's much better than I thought.
 
