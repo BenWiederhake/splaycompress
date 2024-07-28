@@ -1,34 +1,29 @@
 use std::array::from_fn;
 
-type BaseUnit = u8;
-
-// Causes stack overflow by allocating 262 KiB?!
-// type BaseUnit = u16;
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum NodeRef {
-    Internal(BaseUnit),
-    Leaf(BaseUnit),
+    Internal(u8),
+    Leaf(u8),
 }
 
 impl NodeRef {
-    fn new_leaf(v: BaseUnit) -> NodeRef {
+    fn new_leaf(v: u8) -> NodeRef {
         NodeRef::Leaf(v)
     }
 
-    fn new_internal(v: BaseUnit) -> NodeRef {
-        assert!(v != BaseUnit::MAX, "too large internal ID: {v}");
+    fn new_internal(v: u8) -> NodeRef {
+        assert!(v != u8::MAX, "too large internal ID: {v}");
         NodeRef::Internal(v)
     }
 
-    fn as_leaf(&self) -> Option<BaseUnit> {
+    fn as_leaf(&self) -> Option<u8> {
         match self {
             NodeRef::Leaf(v) => Some(*v),
             _ => None,
         }
     }
 
-    fn as_internal(&self) -> Option<BaseUnit> {
+    fn as_internal(&self) -> Option<u8> {
         match self {
             NodeRef::Internal(v) => Some(*v),
             _ => None,
@@ -88,18 +83,18 @@ impl Node {
 
 #[derive(Debug)]
 pub struct SplayTree {
-    internal_nodes: [Node; BaseUnit::MAX as usize],
+    internal_nodes: [Node; u8::MAX as usize],
     // A leaf is always "right before" its corresponding internal node, if any.
     // That must be this way around, because there is a leaf 255 but no internal node 255. (Or 65535.)
-    root: BaseUnit,
+    root: u8,
 }
 
 impl SplayTree {
     pub fn new_uniform() -> SplayTree {
-        let nodes: [Node; BaseUnit::MAX as usize] = from_fn(|i| {
+        let nodes: [Node; u8::MAX as usize] = from_fn(|i| {
             let level = i.trailing_ones();
-            assert!(level < BaseUnit::BITS);
-            let ibu = i as BaseUnit;
+            assert!(level < u8::BITS);
+            let ibu = i as u8;
             if level == 0 {
                 Node {
                     left: NodeRef::new_leaf(ibu),
@@ -116,19 +111,19 @@ impl SplayTree {
         });
         SplayTree {
             internal_nodes: nodes,
-            root: BaseUnit::MAX / 2,
+            root: u8::MAX / 2,
         }
     }
 
     fn is_consistent(&self) -> bool {
-        self.is_subtree_consistent(self.root, 0, BaseUnit::MAX)
+        self.is_subtree_consistent(self.root, 0, u8::MAX)
     }
 
     fn is_subtree_consistent(
         &self,
-        root_index: BaseUnit,
-        cover_min: BaseUnit,
-        cover_max_incl: BaseUnit,
+        root_index: u8,
+        cover_min: u8,
+        cover_max_incl: u8,
     ) -> bool {
         let node = &self.internal_nodes[root_index as usize];
         // eprintln!("ENTER internal node {root_index}={node:?} cover_min={cover_min}, cover_max_incl={cover_max_incl}");
@@ -148,8 +143,8 @@ impl SplayTree {
     fn is_arm_consistent(
         &self,
         root: &NodeRef,
-        cover_min: BaseUnit,
-        cover_max_incl: BaseUnit,
+        cover_min: u8,
+        cover_max_incl: u8,
     ) -> bool {
         if let Some(child_index) = root.as_internal() {
             return self.is_subtree_consistent(child_index, cover_min, cover_max_incl);
@@ -170,7 +165,7 @@ pub struct Splayable<'a> {
     tree: &'a mut SplayTree,
     node: NodeRef,
     // TODO: This should live in SplayTree, not here, for memory allocation purposes.
-    internal_parents: Vec<(BaseUnit, Direction)>,
+    internal_parents: Vec<(u8, Direction)>,
 }
 
 impl<'a> Splayable<'a> {
@@ -179,11 +174,11 @@ impl<'a> Splayable<'a> {
         Self {
             tree,
             node,
-            internal_parents: Vec::with_capacity(BaseUnit::BITS as usize * 2),
+            internal_parents: Vec::with_capacity(u8::BITS as usize * 2),
         }
     }
 
-    pub fn current_value(&self) -> BaseUnit {
+    pub fn current_value(&self) -> u8 {
         match self.node {
             NodeRef::Internal(v) => v,
             NodeRef::Leaf(v) => v,
@@ -379,9 +374,9 @@ mod tests {
 
     #[test]
     fn test_sizes() {
-        // "1 + padding" = size_of::<BaseUnit>(), meh
+        // "1 + padding" = size_of::<u8>(), meh
         assert_eq!(
-            size_of::<BaseUnit>() + size_of::<BaseUnit>(),
+            size_of::<u8>() + size_of::<u8>(),
             size_of::<NodeRef>()
         );
     }
@@ -390,10 +385,10 @@ mod tests {
     fn test_ref_leaf() {
         let leaf_0 = NodeRef::new_leaf(0);
         let leaf_10 = NodeRef::new_leaf(10);
-        let leaf_max = NodeRef::new_leaf(BaseUnit::MAX);
+        let leaf_max = NodeRef::new_leaf(u8::MAX);
         assert_eq!(leaf_0.as_leaf(), Some(0));
         assert_eq!(leaf_10.as_leaf(), Some(10));
-        assert_eq!(leaf_max.as_leaf(), Some(BaseUnit::MAX));
+        assert_eq!(leaf_max.as_leaf(), Some(u8::MAX));
         assert_eq!(leaf_0.as_internal(), None);
         assert_eq!(leaf_10.as_internal(), None);
         assert_eq!(leaf_max.as_internal(), None);
@@ -403,10 +398,10 @@ mod tests {
     fn test_ref_internal() {
         let int_0 = NodeRef::new_internal(0);
         let int_10 = NodeRef::new_internal(10);
-        let int_max = NodeRef::new_internal(BaseUnit::MAX - 1);
+        let int_max = NodeRef::new_internal(u8::MAX - 1);
         assert_eq!(int_0.as_internal(), Some(0));
         assert_eq!(int_10.as_internal(), Some(10));
-        assert_eq!(int_max.as_internal(), Some(BaseUnit::MAX - 1));
+        assert_eq!(int_max.as_internal(), Some(u8::MAX - 1));
         assert_eq!(int_0.as_leaf(), None);
         assert_eq!(int_10.as_leaf(), None);
         assert_eq!(int_max.as_leaf(), None);
@@ -415,7 +410,7 @@ mod tests {
     #[test]
     #[should_panic = "too large internal ID"]
     fn test_ref_internal_overflow() {
-        NodeRef::new_internal(BaseUnit::MAX);
+        NodeRef::new_internal(u8::MAX);
     }
 
     #[test]
