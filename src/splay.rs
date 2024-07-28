@@ -43,7 +43,7 @@ struct Node {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Direction {
+pub enum Direction {
     Left,
     Right,
 }
@@ -54,6 +54,19 @@ impl Direction {
             Direction::Left => Direction::Right,
             Direction::Right => Direction::Left,
         }
+    }
+
+    pub fn from_bit(bit: bool) -> Direction {
+        if bit {
+            Direction::Right
+        } else {
+            Direction::Left
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn to_bit(&self) -> bool {
+        self == &Direction::Right
     }
 }
 
@@ -74,7 +87,7 @@ impl Node {
 }
 
 #[derive(Debug)]
-struct SplayTree {
+pub struct SplayTree {
     internal_nodes: [Node; BaseUnit::MAX as usize],
     // A leaf is always "right before" its corresponding internal node, if any.
     // That must be this way around, because there is a leaf 255 but no internal node 255. (Or 65535.)
@@ -82,7 +95,7 @@ struct SplayTree {
 }
 
 impl SplayTree {
-    fn new_uniform() -> SplayTree {
+    pub fn new_uniform() -> SplayTree {
         let nodes: [Node; BaseUnit::MAX as usize] = from_fn(|i| {
             let level = i.trailing_ones();
             assert!(level < BaseUnit::BITS);
@@ -147,13 +160,13 @@ impl SplayTree {
         panic!("empty child?!")
     }
 
-    fn splayable_mut(&mut self) -> Splayable {
+    pub fn splayable_mut(&mut self) -> Splayable {
         Splayable::new(self)
     }
 }
 
 #[derive(Debug)]
-struct Splayable<'a> {
+pub struct Splayable<'a> {
     tree: &'a mut SplayTree,
     node: NodeRef,
     // TODO: This should live in SplayTree, not here, for memory allocation purposes.
@@ -170,18 +183,22 @@ impl<'a> Splayable<'a> {
         }
     }
 
-    fn current_value(&self) -> BaseUnit {
+    pub fn current_value(&self) -> BaseUnit {
         match self.node {
             NodeRef::Internal(v) => v,
             NodeRef::Leaf(v) => v,
         }
     }
 
-    fn is_leaf(&self) -> bool {
+    pub fn is_root(&self) -> bool {
+        self.internal_parents.is_empty()
+    }
+
+    pub fn is_leaf(&self) -> bool {
         matches!(self.node, NodeRef::Leaf(_))
     }
 
-    fn go(&mut self, dir: Direction) {
+    pub fn go(&mut self, dir: Direction) {
         let node_id = match self.node {
             NodeRef::Internal(v) => v,
             _ => panic!("Tried to descend on leaf?!"),
@@ -191,7 +208,35 @@ impl<'a> Splayable<'a> {
         self.node = node.arm(dir);
     }
 
-    fn splay_parent_of_leaf(&mut self) {
+    pub fn find_deep_internal(&self, min_length: usize) -> u8 {
+        assert!(self.is_root());
+        assert!(!self.is_leaf());
+        let mut level = 0;
+        let mut candidates = vec![self.node.as_internal().unwrap()];
+        while level < min_length {
+            level += 1;
+            assert!(!candidates.is_empty());
+            let mut next_candidates = Vec::with_capacity(candidates.len() * 2);
+            for candidate_id in &candidates {
+                let node = &self.tree.internal_nodes[*candidate_id as usize];
+                for d in [Direction::Left, Direction::Right] {
+                    let noderef = node.arm(d);
+                    if let Some(child_id) = noderef.as_internal() {
+                        next_candidates.push(child_id);
+                    }
+                }
+            }
+            candidates = next_candidates;
+        }
+        assert!(!candidates.is_empty());
+        candidates[0]
+    }
+
+    pub fn is_consistent(&self) -> bool {
+        self.tree.is_consistent()
+    }
+
+    pub fn splay_parent_of_leaf(&mut self) {
         assert!(self.is_leaf());
         self.node = NodeRef::new_internal(self.internal_parents.pop().unwrap().0);
         self.splay_internal();
@@ -680,5 +725,13 @@ mod tests {
         }
         assert_eq!(tree.root, 0b1001_1100);
         assert!(tree.is_consistent());
+    }
+
+    #[test]
+    fn test_dir_roundtrip() {
+        assert_eq!(Direction::Right, Direction::from_bit(Direction::Right.to_bit()));
+        assert_eq!(Direction::Left, Direction::from_bit(Direction::Left.to_bit()));
+        assert!(Direction::from_bit(true).to_bit());
+        assert!(!Direction::from_bit(false).to_bit());
     }
 }

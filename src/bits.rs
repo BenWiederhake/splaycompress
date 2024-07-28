@@ -1,13 +1,13 @@
 use std::io::*;
 
-struct BitWriter<W: Write> {
+pub struct BitWriter<W: Write> {
     backing: W,
     nbits: usize, // invariant: `nbits <= 7`
     buf: u8,      // invariant: `buf & 0x80 == 0`
 }
 
 impl<W: Write> BitWriter<W> {
-    fn new(backing: W) -> Self {
+    pub fn new(backing: W) -> Self {
         Self {
             backing,
             nbits: 0,
@@ -15,12 +15,12 @@ impl<W: Write> BitWriter<W> {
         }
     }
 
-    fn flush(&mut self) -> Result<()> {
+    pub fn flush(&mut self) -> Result<()> {
         assert_eq!(self.nbits, 0);
         self.backing.flush()
     }
 
-    fn write_bit(&mut self, set: bool) -> Result<()> {
+    pub fn write_bit(&mut self, set: bool) -> Result<()> {
         self.buf <<= 1;
         if set {
             self.buf |= 1;
@@ -37,7 +37,7 @@ impl<W: Write> BitWriter<W> {
         }
     }
 
-    fn padding_needed(&self) -> usize {
+    pub fn padding_needed(&self) -> usize {
         if self.nbits > 0 {
             8 - self.nbits
         } else {
@@ -46,14 +46,14 @@ impl<W: Write> BitWriter<W> {
     }
 }
 
-struct BitReader<R: Read> {
+pub struct BitReader<R: Read> {
     backing: R,
     nbits: usize, // invariant: `nbits <= 7`
     buf: u8,      // invariant: `buf & 0x01 == 0`
 }
 
 impl<R: Read> BitReader<R> {
-    fn new(backing: R) -> Self {
+    pub fn new(backing: R) -> Self {
         Self {
             backing,
             nbits: 0,
@@ -61,7 +61,7 @@ impl<R: Read> BitReader<R> {
         }
     }
 
-    fn read_bit(&mut self) -> Result<bool> {
+    pub fn read_bit(&mut self) -> Result<bool> {
         if self.nbits == 0 {
             let mut buf = [0];
             // Might raise ErrorKind::UnexpectedEof:
