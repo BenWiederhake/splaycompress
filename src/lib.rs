@@ -13,6 +13,21 @@ use symbol::{
     SymbolWrite16LE, SymbolWrite8,
 };
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Flavor {
+    Symbol8,
+    Symbol16BE,
+    Symbol16LE,
+}
+
+pub fn compress<R: Read, W: Write>(flavor: Flavor, r: R, w: W) -> Result<()> {
+    match flavor {
+        Flavor::Symbol8 => compress8(r, w),
+        Flavor::Symbol16BE => compress16be(r, w),
+        Flavor::Symbol16LE => compress16le(r, w),
+    }
+}
+
 pub fn compress8<R: Read, W: Write>(r: R, w: W) -> Result<()> {
     let mut arena = Arena8::new_uniform();
     compress_raw(&mut arena, &mut SymbolRead8(r), w)
@@ -26,6 +41,14 @@ pub fn compress16be<R: Read, W: Write>(r: R, w: W) -> Result<()> {
 pub fn compress16le<R: Read, W: Write>(r: R, w: W) -> Result<()> {
     let mut arena = Arena16::new_uniform();
     compress_raw(&mut arena, &mut SymbolRead16LE(r), w)
+}
+
+pub fn decompress<R: Read, W: Write>(flavor: Flavor, r: R, w: W) -> Result<()> {
+    match flavor {
+        Flavor::Symbol8 => decompress8(r, w),
+        Flavor::Symbol16BE => decompress16be(r, w),
+        Flavor::Symbol16LE => decompress16le(r, w),
+    }
 }
 
 pub fn decompress8<R: Read, W: Write>(r: R, w: W) -> Result<()> {
@@ -121,66 +144,103 @@ pub fn decompress_raw<
 mod tests {
     use super::*;
 
-    fn assert_compression8(input: &[u8], output: &[u8]) {
+    fn assert_compression(flavor: Flavor, input: &[u8], output: &[u8]) {
         let mut buf = Vec::new();
-        compress8(input, &mut buf).unwrap();
+        compress(flavor, input, &mut buf).unwrap();
         assert_eq!(output, &buf);
     }
 
-    fn assert_decompression8(input: &[u8], output: &[u8]) {
+    fn assert_decompression(flavor: Flavor, input: &[u8], output: &[u8]) {
         let mut buf = Vec::new();
-        decompress8(input, &mut buf).unwrap();
+        decompress(flavor, input, &mut buf).unwrap();
         assert_eq!(output, &buf);
     }
 
-    fn assert_roundtrip8(plaintext: &[u8], compressed: &[u8]) {
-        assert_compression8(plaintext, compressed);
-        assert_decompression8(compressed, plaintext);
+    fn assert_roundtrip(flavor: Flavor, plaintext: &[u8], compressed: &[u8]) {
+        assert_compression(flavor, plaintext, compressed);
+        assert_decompression(flavor, compressed, plaintext);
     }
 
     #[test]
     fn test_empty() {
-        assert_roundtrip8(&[], &[]);
+        assert_roundtrip(Flavor::Symbol8, &[], &[]);
+        assert_roundtrip(Flavor::Symbol16BE, &[], &[]);
+        assert_roundtrip(Flavor::Symbol16LE, &[], &[]);
     }
 
     #[test]
-    fn test_single_byte() {
+    fn test_single_symbol_8() {
         for b in 0..=255 {
-            assert_roundtrip8(&[b], &[b]);
+            assert_roundtrip(Flavor::Symbol8, &[b], &[b]);
+        }
+    }
+
+    #[test]
+    #[ignore = "slow (takes around 30 seconds with --release)"]
+    fn test_single_symbol_16() {
+        for b1 in 0..=255 {
+            for b2 in 0..=255 {
+                assert_roundtrip(Flavor::Symbol16BE, &[b1, b2], &[b1, b2]);
+                assert_roundtrip(Flavor::Symbol16LE, &[b1, b2], &[b2, b1]); // flipped!
+            }
         }
     }
 
     #[test]
     fn test_hello_world() {
-        assert_roundtrip8(
+        assert_roundtrip(
+            Flavor::Symbol8,
             b"Hello, World!\n",
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x50",
+        );
+        assert_roundtrip(
+            Flavor::Symbol16BE,
+            b"Hello, World!\n",
+            b"\x48\x65\xac\x6c\x99\x60\x40\xaf\x8e\x4a\xf4\x43\x0a",
+        );
+        assert_roundtrip(
+            Flavor::Symbol16LE,
+            b"Hello, World!\n",
+            b"\x65\x48\xa8\xd8\x16\x37\xcd\xc8\x34\x9b\xd5\x36\x02\x88\x40",
         );
     }
 
     #[test]
+    fn test_16_odd() {
+        assert_decompression(Flavor::Symbol16BE, b"\x48\x65", b"He");
+        assert_decompression(Flavor::Symbol16BE, b"\x48\x65\x00", b"He");
+        assert_decompression(Flavor::Symbol16BE, b"\x48\x65\xff", b"He");
+    }
+
+    #[test]
     fn test_hello_world_alternatives() {
-        assert_decompression8(
+        assert_decompression(
+            Flavor::Symbol8,
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x51",
             b"Hello, World!\n",
         );
-        assert_decompression8(
+        assert_decompression(
+            Flavor::Symbol8,
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x52",
             b"Hello, World!\n",
         );
-        assert_decompression8(
+        assert_decompression(
+            Flavor::Symbol8,
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x54",
             b"Hello, World!\n",
         );
-        assert_decompression8(
+        assert_decompression(
+            Flavor::Symbol8,
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x55",
             b"Hello, World!\n",
         );
-        assert_decompression8(
+        assert_decompression(
+            Flavor::Symbol8,
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x56",
             b"Hello, World!\n",
         );
-        assert_decompression8(
+        assert_decompression(
+            Flavor::Symbol8,
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x57",
             b"Hello, World!\n",
         );
@@ -188,17 +248,21 @@ mod tests {
 
     #[test]
     fn test_anti_hello_world() {
-        assert_roundtrip8(b"HH+(($$###\"\"\x10\x0a#'(H*H(()(\x0b$", b"Hello, World!\n");
+        assert_roundtrip(
+            Flavor::Symbol8,
+            b"HH+(($$###\"\"\x10\x0a#'(H*H(()(\x0b$",
+            b"Hello, World!\n",
+        );
     }
 
     #[test]
-    #[ignore = "slow (takes around 4 seconds)"] // Use 'cargo test -- --include-ignored' or similar.
+    #[ignore = "slow (takes around 4 seconds with --release)"] // Use 'cargo test -- --include-ignored' or similar.
     fn test_two_bytes() {
         for b1 in 0..=255 {
             for b2 in 0..=255 {
                 let mut buf = Vec::new();
                 compress8(&[b1, b2][..], &mut buf).unwrap();
-                assert_decompression8(&buf, &[b1, b2]);
+                assert_decompression(Flavor::Symbol8, &buf, &[b1, b2]);
             }
         }
     }
@@ -206,7 +270,7 @@ mod tests {
     #[test]
     fn test_short() {
         // Look at this! General-purpose compression that manages to shorten (these) 7 bytes to just 6 bytes!
-        assert_roundtrip8(b"short", b"\x73\x51\x3e\xf2\x00");
-        assert_roundtrip8(b"shorter", b"\x73\x51\x3e\xf2\x02\xb4");
+        assert_roundtrip(Flavor::Symbol8, b"short", b"\x73\x51\x3e\xf2\x00");
+        assert_roundtrip(Flavor::Symbol8, b"shorter", b"\x73\x51\x3e\xf2\x02\xb4");
     }
 }
