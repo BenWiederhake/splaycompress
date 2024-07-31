@@ -119,12 +119,7 @@ impl SplayTree {
         self.is_subtree_consistent(self.root, 0, u8::MAX)
     }
 
-    fn is_subtree_consistent(
-        &self,
-        root_index: u8,
-        cover_min: u8,
-        cover_max_incl: u8,
-    ) -> bool {
+    fn is_subtree_consistent(&self, root_index: u8, cover_min: u8, cover_max_incl: u8) -> bool {
         let node = &self.internal_nodes[root_index as usize];
         // eprintln!("ENTER internal node {root_index}={node:?} cover_min={cover_min}, cover_max_incl={cover_max_incl}");
         let index_consistent = cover_min <= root_index && root_index < cover_max_incl;
@@ -140,12 +135,7 @@ impl SplayTree {
         index_consistent && left_consistent && right_consistent
     }
 
-    fn is_arm_consistent(
-        &self,
-        root: &NodeRef,
-        cover_min: u8,
-        cover_max_incl: u8,
-    ) -> bool {
+    fn is_arm_consistent(&self, root: &NodeRef, cover_min: u8, cover_max_incl: u8) -> bool {
         if let Some(child_index) = root.as_internal() {
             return self.is_subtree_consistent(child_index, cover_min, cover_max_incl);
         }
@@ -375,10 +365,7 @@ mod tests {
     #[test]
     fn test_sizes() {
         // "1 + padding" = size_of::<u8>(), meh
-        assert_eq!(
-            size_of::<u8>() + size_of::<u8>(),
-            size_of::<NodeRef>()
-        );
+        assert_eq!(size_of::<u8>() + size_of::<u8>(), size_of::<NodeRef>());
     }
 
     #[test]
@@ -724,8 +711,14 @@ mod tests {
 
     #[test]
     fn test_dir_roundtrip() {
-        assert_eq!(Direction::Right, Direction::from_bit(Direction::Right.to_bit()));
-        assert_eq!(Direction::Left, Direction::from_bit(Direction::Left.to_bit()));
+        assert_eq!(
+            Direction::Right,
+            Direction::from_bit(Direction::Right.to_bit())
+        );
+        assert_eq!(
+            Direction::Left,
+            Direction::from_bit(Direction::Left.to_bit())
+        );
         assert!(Direction::from_bit(true).to_bit());
         assert!(!Direction::from_bit(false).to_bit());
     }

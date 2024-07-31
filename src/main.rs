@@ -1,10 +1,10 @@
 mod bits;
 mod splay;
 
-use bits::{ BitReader, BitWriter };
-use splay::{ Direction, SplayTree };
-use std::io::{ stdin, stdout, ErrorKind, Read, Result, Write };
+use bits::{BitReader, BitWriter};
 use clap::Parser;
+use splay::{Direction, SplayTree};
+use std::io::{stdin, stdout, ErrorKind, Read, Result, Write};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -127,7 +127,7 @@ mod tests {
     fn test_hello_world() {
         assert_roundtrip(
             b"Hello, World!\n",
-            b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x50"
+            b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x50",
         );
     }
 
@@ -135,27 +135,27 @@ mod tests {
     fn test_hello_world_alternatives() {
         assert_decompression(
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x51",
-            b"Hello, World!\n"
+            b"Hello, World!\n",
         );
         assert_decompression(
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x52",
-            b"Hello, World!\n"
+            b"Hello, World!\n",
         );
         assert_decompression(
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x54",
-            b"Hello, World!\n"
+            b"Hello, World!\n",
         );
         assert_decompression(
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x55",
-            b"Hello, World!\n"
+            b"Hello, World!\n",
         );
         assert_decompression(
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x56",
-            b"Hello, World!\n"
+            b"Hello, World!\n",
         );
         assert_decompression(
             b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x57",
-            b"Hello, World!\n"
+            b"Hello, World!\n",
         );
     }
 
