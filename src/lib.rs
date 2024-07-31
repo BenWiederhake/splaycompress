@@ -1,6 +1,7 @@
 mod bits;
 mod common;
 mod splay;
+mod symbol;
 
 use bits::{BitReader, BitWriter};
 use common::Direction;
