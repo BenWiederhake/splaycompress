@@ -143,14 +143,26 @@ Both of these points could be _slightly_ improved by using 16-bit words as the b
 
 This approach won't conquer the world, I know. But still, it's much better than I thought.
 
+### Filemagics
+
+Because there is more than one format of splaycompress (and in fact more than one file format on earth),
+filemagics exist. They are a popular way to quickly self-identify data as a particular format,
+in lieu of a singular, global format-format.
+
+For `jan`, I chose a very simple strategy: Generate 6 random bytes, add the bytes `0x00` and `\\r` (`\\x0d`), and shuffle the list until these bytes in an order where neither "special" byte is at either end. (If I had generated one of the two special bytes, I would have restarted.) This strategy should strike a reasonable balance between uniqueness (48 random bits), succinctness (only 8 bytes), and built-in error detection (especially line-ending conversions and other accidental text-like transformations.) As an exception to this rule, the filemagic for Symbol16LE is the reverse of Symbol16BE, for increased recognizability.
+
+In particular:
+
+- "Symbol8", i.e. each byte is a symbol of 8 bits, starting with its most significant bit: `b"\xb3\xa9\x14\x00\xb9\x6c\x0d\xd8"`, with potential alternative representations of the same bytes: `b"\xb3\xa9\x14\x00\xb9l\r\xd8"` (ASCII-fied where possible), or `s6kUALlsDdg=` (base64), or `scallion passenger baboon adroitness sentence handiwork ancient stupendous` (PGP wordlist)
+- "Symbol16BE", i.e. each two-byte word is a symbol of 16 bits, starting with the most significant bit of the first byte: `b"\xf6\x5a\x00\x0d\x4f\xc0\x41\xf2"`, with potential alternative representations of the same bytes: `b"\xf6Z\x00\rO\xc0A\xf2"` (ASCII-fied where possible), or `9loADU/AQfI=` (base64), or `village existence aardvark asteroid dropper recipe cranky vagabond` (PGP wordlist)
+- "Symbol16LE", i.e. each two-byte word is a symbol of 16 bits, starting with the most significant bit of the first byte: `b"\xf2\x41\xc0\x4f\x0d\x00\x5a\xf6"`, with potential alternative representations of the same bytes: `b"\xf2A\xc0O\r\x00Z\xf6"` (ASCII-fied where possible), or `8kHATw0AWvY=` (base64), or `uproot decadence slowdown document ancient adroitness enlist vocalist` (PGP wordlist)
+
 ## TODOs
 
 - Publish it somewhere, see what friends and people think
 - Maybe make it a real library on crates.io
 - Compare with other compression schemes.
 - Try to do some performance improvements – however, compressing random data already runs at around 9 MiB/s, and compressing all-zeros runs at around 91 MiB/s on my machine. I don't really see the point of optimizing this even further.
-
-If anyone wants to standardize this, I would like to suggest the filemagic for "raw splaycompress data, no metadata except this filemagic" to be `\xb3\xa9\x14\x00\xb9\x6c\x0d\xd8`. (These are 6 random bytes, the NUL byte, and the '\\r' byte, which I re-shuffled until neither of the two injected bytes are at either end. This should provide a good balance between global uniqueness and build-in error detection. )
 
 ## Contribute
 
