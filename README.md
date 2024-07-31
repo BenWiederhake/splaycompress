@@ -41,11 +41,15 @@ splaycompress beats most other compression methods easily, and not just by omitt
 
 ## Install
 
-This software isn't ready yet for widespread use. However, it's less than 1000 lines of code, it's MIT licensed, so you could just copy it.
+This software isn't ready yet for widespread use. However, it's less than 1000 lines of code, it's MIT licensed, so you could just copy it and install it with `cargo`.
 
 I might make it available through crates.io if there is any demand.
 
 ## Usage
+
+The library itself provides two functions, `compress` and `decompress`, each of which takes an input implementing `Read` and an output implementing `Write`. They both read the input, (de)compress it, and write the result to the output.
+
+### `jan`, the CLI tool
 
 Currently, the program is extremely simple and stupid:
 

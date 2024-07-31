@@ -124,12 +124,16 @@ impl SplayTree {
         // eprintln!("ENTER internal node {root_index}={node:?} cover_min={cover_min}, cover_max_incl={cover_max_incl}");
         let index_consistent = cover_min <= root_index && root_index < cover_max_incl;
         if !index_consistent {
-            eprintln!("internal node {root_index} not consistent: cover_min={cover_min}, cover_max_incl={cover_max_incl}");
+            eprintln!(
+                "internal node {root_index} not consistent: cover_min={cover_min}, cover_max_incl={cover_max_incl}"
+            );
         }
         let left_consistent = self.is_arm_consistent(&node.left, cover_min, root_index);
         let right_consistent = self.is_arm_consistent(&node.right, root_index + 1, cover_max_incl);
         if !left_consistent || !right_consistent {
-            eprintln!("internal node {root_index} has inconsistent arms: cover_min={cover_min}, cover_max_incl={cover_max_incl}");
+            eprintln!(
+                "internal node {root_index} has inconsistent arms: cover_min={cover_min}, cover_max_incl={cover_max_incl}"
+            );
         }
         //eprintln!("EXIT internal node {root_index} cover_min={cover_min}, cover_max_incl={cover_max_incl}");
         index_consistent && left_consistent && right_consistent
@@ -164,7 +168,7 @@ impl<'a> Splayable<'a> {
         Self {
             tree,
             node,
-            internal_parents: Vec::with_capacity(u8::BITS as usize * 2),
+            internal_parents: Vec::with_capacity((u8::BITS as usize) * 2),
         }
     }
 
