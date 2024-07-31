@@ -1,4 +1,4 @@
-use splaycompress::{compress, decompress};
+use splaycompress::{compress8, decompress8};
 use std::io::{stdin, stdout};
 
 use clap::Parser;
@@ -16,8 +16,8 @@ fn main() {
     let w = stdout().lock();
     let args = Args::parse();
     if args.decompress {
-        decompress(r, w).unwrap();
+        decompress8(r, w).unwrap();
     } else {
-        compress(r, w).unwrap();
+        compress8(r, w).unwrap();
     }
 }

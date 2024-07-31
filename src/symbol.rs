@@ -8,7 +8,7 @@ pub trait SymbolRead<T> {
     fn read_one(&mut self) -> Result<Option<T>>;
 }
 
-pub struct SymbolRead8<R: Read>(R);
+pub struct SymbolRead8<R: Read>(pub R);
 
 impl<R: Read> SymbolRead<u8> for SymbolRead8<R> {
     fn read_one(&mut self) -> Result<Option<u8>> {
@@ -45,7 +45,7 @@ fn read_two_bytes<R: Read>(r: &mut R) -> Result<Option<[u8; 2]>> {
     }
 }
 
-pub struct SymbolRead16LE<R: Read>(R);
+pub struct SymbolRead16LE<R: Read>(pub R);
 
 impl<R: Read> SymbolRead<u16> for SymbolRead16LE<R> {
     fn read_one(&mut self) -> Result<Option<u16>> {
@@ -54,7 +54,7 @@ impl<R: Read> SymbolRead<u16> for SymbolRead16LE<R> {
     }
 }
 
-pub struct SymbolRead16BE<R: Read>(R);
+pub struct SymbolRead16BE<R: Read>(pub R);
 
 impl<R: Read> SymbolRead<u16> for SymbolRead16BE<R> {
     fn read_one(&mut self) -> Result<Option<u16>> {
@@ -67,32 +67,45 @@ pub trait SymbolWrite<T> {
     /// This is supposed to write exactly one symbol.
     /// TODO: Revisit this interface when dealing with higher throughput.
     fn write_one(&mut self, symbol: T) -> Result<()>;
+    fn flush(&mut self) -> Result<()>;
 }
 
-pub struct SymbolWrite8<W: Write>(W);
+pub struct SymbolWrite8<W: Write>(pub W);
 
 impl<W: Write> SymbolWrite<u8> for SymbolWrite8<W> {
     fn write_one(&mut self, symbol: u8) -> Result<()> {
         let buf = [symbol];
         self.0.write_all(buf.as_slice())
     }
+
+    fn flush(&mut self) -> Result<()> {
+        self.0.flush()
+    }
 }
 
-pub struct SymbolWrite16LE<W: Write>(W);
+pub struct SymbolWrite16LE<W: Write>(pub W);
 
 impl<W: Write> SymbolWrite<u16> for SymbolWrite16LE<W> {
     fn write_one(&mut self, symbol: u16) -> Result<()> {
         let buf = symbol.to_le_bytes();
         self.0.write_all(buf.as_slice())
     }
+
+    fn flush(&mut self) -> Result<()> {
+        self.0.flush()
+    }
 }
 
-pub struct SymbolWrite16BE<W: Write>(W);
+pub struct SymbolWrite16BE<W: Write>(pub W);
 
 impl<W: Write> SymbolWrite<u16> for SymbolWrite16BE<W> {
     fn write_one(&mut self, symbol: u16) -> Result<()> {
         let buf = symbol.to_be_bytes();
         self.0.write_all(buf.as_slice())
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        self.0.flush()
     }
 }
 
