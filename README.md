@@ -1,6 +1,7 @@
 # splaycompress
 
 This is a simple compression utility, with two purposes:
+
 - It serves as a proof-of-concept, to demonstrate that Splay Trees (invented by [Robert Tarjan](https://en.wikipedia.org/wiki/Robert_Tarjan)) can be used to compress data reasonably well.
 - It can be used as a file compression method, for which I hereby define the `.jan` file extension. If you compress a tarball this way, it would have the [`.tar.jan`](https://en.wikipedia.org/wiki/Robert_Tarjan) file extension.
 
@@ -10,20 +11,20 @@ However, this compression scheme is actually surprisingly good for short snippet
 
 For example, running on the input `However, this compression scheme is actually surprisingly good for short snippets of data, often beating zstd, lz4, and others.\n`, we get the following results:
 
-| Program  | Bytes |
-|-------------------------|--|
-| p7zip | 214 |
-| lzop | 182 |
-| xz | 180 |
-| lz4 | 147 |
-| bzip2 | 136 |
-| lzma | 135 |
-| (none) | 128 |
-| gzip | 121 |
-| zstd | 114 |
-| zlib | 109 |
-| splaycompress | 103 |
-| brotli-rs | 87 |
+| Program       | Bytes |
+| ------------- | ----- |
+| p7zip         | 214   |
+| lzop          | 182   |
+| xz            | 180   |
+| lz4           | 147   |
+| bzip2         | 136   |
+| lzma          | 135   |
+| (none)        | 128   |
+| gzip          | 121   |
+| zstd          | 114   |
+| zlib          | 109   |
+| splaycompress | 103   |
+| brotli-rs     | 87    |
 
 Using `-9` and/or `-f` does not seem to change these numbers.
 
@@ -50,7 +51,7 @@ Currently, the program is extremely simple and stupid:
 
 - With no CLI-arguments, it compresses data from stdin to stdout, stopping only when EOF is reached, then flushing the rest to stdout.
 - With the `-d` CLI-argument, it *DE*compresses data from stdin to stdout, stopping only when EOF is reached, then flushing the rest to stdout.
-- All other CLI-arguments are an error.
+- `clap` provides `-h`/`--help` and `-V`/`--version` commands by default
 
 Examples:
 
@@ -65,7 +66,7 @@ $ echo "This is a simple example" | cargo run -q | cargo run -q -- -d | hd
 00000019
 ```
 
-Since *all* data is a valid bitstream, you can even "decompress" arbitrary data, for fun and (probably) no profit:
+Since _all_ data is a valid bitstream, you can even "decompress" arbitrary data, for fun and (probably) no profit:
 
 ```console
 $ echo "Decompressing this probably won't make much sense." | cargo run -q -- -d | hd
@@ -91,9 +92,9 @@ There wasn't.
 
 My heart was broken, and my soul yearned to fill this hole in the world, which needs a pun now more than ever in the history of jokes.
 
-Over the course of several years, I tried out various way to make it work. But how would [strongly connected components](https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm) do any compression? The [median of medians](https://en.wikipedia.org/wiki/Median_of_medians) algorithm trips up many Computer Science students, and *feels* vaguely related to compression due to its surprisingly-linear runtime, but I don't see how to make it work. I love the seeming simplicity of [Union-Find](https://en.wikipedia.org/wiki/Disjoint-set_data_structure), but the monotonocity of the data structure doesn't seem to be compatible with the concept of continuous compression operations at all. In fact, I got stuck trying to think of general graph-based algorithms for way too long.
+Over the course of several years, I tried out various way to make it work. But how would [strongly connected components](https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm) do any compression? The [median of medians](https://en.wikipedia.org/wiki/Median_of_medians) algorithm trips up many Computer Science students, and _feels_ vaguely related to compression due to its surprisingly-linear runtime, but I don't see how to make it work. I love the seeming simplicity of [Union-Find](https://en.wikipedia.org/wiki/Disjoint-set_data_structure), but the monotonocity of the data structure doesn't seem to be compatible with the concept of continuous compression operations at all. In fact, I got stuck trying to think of general graph-based algorithms for way too long.
 
-But Splay Trees are the *obvious* and, in hindsight, even *extremely* obvious candidate: Invented by him, and directly relates the concept of "data" to "short representation". Bingo!
+But Splay Trees are the _obvious_ and, in hindsight, even _extremely_ obvious candidate: Invented by him, and directly relates the concept of "data" to "short representation". Bingo!
 
 That allows me to define some compression algorithm and assign the file extension `.jan` to it.
 
@@ -120,6 +121,7 @@ In particular, the [Static Optimality Theorem](https://en.wikipedia.org/wiki/Spl
 This means that for inputs from one of the many classes of sequences for which Splay Trees have been proven to perform exceptionally-well, the above algorithm will emit very few bits, which is exactly what we commonly refer to as "compression".
 
 This means that the compression works exceptionally well for (at least) the following kinds of behaviors, without even attempting to recognize or special-case these patterns:
+
 - Repeated bytes (not just zeros or 0xFF!)
 - High-entropy bytes from a reasonably-narrow range (even across power-of-two boundaries! This includes ASCII text!)
 - Scan-like sequences, as is often found in indices.
@@ -130,10 +132,10 @@ Most importantly, this compresses short blobs of data unusually well, without fa
 ### Why it doesn't work
 
 1. Because it can never go below 1 bit per byte, i.e. 12.5%, and even that would require incredible amounts of repetition. Here's a comparison how various compression algorithms behave for prefixes of the `src/splay.rs` file as of this commit. Even zooming in on the most advantageous part of this graph, one can clearly see that splaycompress has a steeper increase in filesize than the other algorithms.
-    ![A comparison of the byte sizes of compressing prefixes of the src/splay.rs file with brotli, bzip2, gzip, lz4, lzma, xz, splaycompress, zlib, and zstd.](meta/comparison.png)
-2. Because it requires incredibly sequential computations and pointer-chasing. My implementation is deliberately local, keeping most of the memory in just a few places. Nevertheless, the way one byte is interpreted completely changes the way the next byte is interpreted, meaning that the throughput is limited by the CPU, with lots of cycles per *bit*.
+   ![A comparison of the byte sizes of compressing prefixes of the src/splay.rs file with brotli, bzip2, gzip, lz4, lzma, xz, splaycompress, zlib, and zstd.](meta/comparison.png)
+2. Because it requires incredibly sequential computations and pointer-chasing. My implementation is deliberately local, keeping most of the memory in just a few places. Nevertheless, the way one byte is interpreted completely changes the way the next byte is interpreted, meaning that the throughput is limited by the CPU, with lots of cycles per _bit_.
 
-Both of these points could be *slightly* improved by using 16-bit words as the basis for everything, but the heightened memory consumption makes this questionable again.
+Both of these points could be _slightly_ improved by using 16-bit words as the basis for everything, but the heightened memory consumption makes this questionable again.
 
 This approach won't conquer the world, I know. But still, it's much better than I thought.
 
@@ -141,7 +143,6 @@ This approach won't conquer the world, I know. But still, it's much better than 
 
 - Publish it somewhere, see what friends and people think
 - Maybe make it a real library on crates.io
-- Maybe make it a usable program (e.g. with clap)
 - Compare with other compression schemes.
 - Try to do some performance improvements – however, compressing random data already runs at around 9 MiB/s, and compressing all-zeros runs at around 91 MiB/s on my machine. I don't really see the point of optimizing this even further.
 

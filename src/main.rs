@@ -1,10 +1,18 @@
 mod bits;
 mod splay;
 
-use bits::{BitReader, BitWriter};
-use splay::{Direction, SplayTree};
-use std::env;
-use std::io::{stdin, stdout, ErrorKind, Read, Result, Write};
+use bits::{ BitReader, BitWriter };
+use splay::{ Direction, SplayTree };
+use std::io::{ stdin, stdout, ErrorKind, Read, Result, Write };
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Whether to decompress instead of compress.
+    #[arg(short, long)]
+    decompress: bool,
+}
 
 fn compress<R: Read, W: Write>(mut r: R, w: W) -> Result<()> {
     let mut tree = SplayTree::new_uniform();
@@ -15,9 +23,13 @@ fn compress<R: Read, W: Write>(mut r: R, w: W) -> Result<()> {
         let mut buf = [0];
         match r.read_exact(buf.as_mut_slice()) {
             Ok(()) => (),
-            Err(e) if e.kind() == ErrorKind::UnexpectedEof => { break; }
-            Err(e) => { return Err(e); }
-        };
+            Err(e) if e.kind() == ErrorKind::UnexpectedEof => {
+                break;
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
         let byte = buf[0];
         while !walker.is_leaf() {
             let bit = byte > walker.current_value();
@@ -54,7 +66,9 @@ fn decompress<R: Read, W: Write>(r: R, mut w: W) -> Result<()> {
                 w.flush()?;
                 return Ok(());
             }
-            Err(e) => { return Err(e); }
+            Err(e) => {
+                return Err(e);
+            }
         };
         walker.go(Direction::from_bit(bit));
         if walker.is_leaf() {
@@ -68,14 +82,11 @@ fn decompress<R: Read, W: Write>(r: R, mut w: W) -> Result<()> {
 fn main() -> Result<()> {
     let r = stdin().lock();
     let w = stdout().lock();
-    let mut args = env::args();
-    let _zeroth_arg = args.next();
-    let first_arg = args.next();
-    let second_arg = args.next();
-    match (first_arg, second_arg) {
-        (None, _) => compress(r, w),
-        (Some(s), None) if s == "-d" => decompress(r, w),
-        _ => unimplemented!()
+    let args = Args::parse();
+    if args.decompress {
+        decompress(r, w)
+    } else {
+        compress(r, w)
     }
 }
 
@@ -114,17 +125,38 @@ mod tests {
 
     #[test]
     fn test_hello_world() {
-        assert_roundtrip(b"Hello, World!\n", b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x50");
+        assert_roundtrip(
+            b"Hello, World!\n",
+            b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x50"
+        );
     }
 
     #[test]
     fn test_hello_world_alternatives() {
-        assert_decompression(b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x51", b"Hello, World!\n");
-        assert_decompression(b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x52", b"Hello, World!\n");
-        assert_decompression(b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x54", b"Hello, World!\n");
-        assert_decompression(b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x55", b"Hello, World!\n");
-        assert_decompression(b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x56", b"Hello, World!\n");
-        assert_decompression(b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x57", b"Hello, World!\n");
+        assert_decompression(
+            b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x51",
+            b"Hello, World!\n"
+        );
+        assert_decompression(
+            b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x52",
+            b"Hello, World!\n"
+        );
+        assert_decompression(
+            b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x54",
+            b"Hello, World!\n"
+        );
+        assert_decompression(
+            b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x55",
+            b"Hello, World!\n"
+        );
+        assert_decompression(
+            b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x56",
+            b"Hello, World!\n"
+        );
+        assert_decompression(
+            b"\x48\xa5\xa8\xf9\x81\x62\x19\x2f\x91\x16\x4a\x40\x57",
+            b"Hello, World!\n"
+        );
     }
 
     #[test]
