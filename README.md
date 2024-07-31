@@ -155,7 +155,7 @@ In particular:
 
 - "Symbol8", i.e. each byte is a symbol of 8 bits, starting with its most significant bit: `b"\xb3\xa9\x14\x00\xb9\x6c\x0d\xd8"`, with potential alternative representations of the same bytes: `b"\xb3\xa9\x14\x00\xb9l\r\xd8"` (ASCII-fied where possible), or `s6kUALlsDdg=` (base64), or `scallion passenger baboon adroitness sentence handiwork ancient stupendous` (PGP wordlist)
 - "Symbol16BE", i.e. each two-byte word is a symbol of 16 bits, starting with the most significant bit of the first byte: `b"\xf6\x5a\x00\x0d\x4f\xc0\x41\xf2"`, with potential alternative representations of the same bytes: `b"\xf6Z\x00\rO\xc0A\xf2"` (ASCII-fied where possible), or `9loADU/AQfI=` (base64), or `village existence aardvark asteroid dropper recipe cranky vagabond` (PGP wordlist)
-- "Symbol16LE", i.e. each two-byte word is a symbol of 16 bits, starting with the most significant bit of the first byte: `b"\xf2\x41\xc0\x4f\x0d\x00\x5a\xf6"`, with potential alternative representations of the same bytes: `b"\xf2A\xc0O\r\x00Z\xf6"` (ASCII-fied where possible), or `8kHATw0AWvY=` (base64), or `uproot decadence slowdown document ancient adroitness enlist vocalist` (PGP wordlist)
+- "Symbol16LE", i.e. each two-byte word is a symbol of 16 bits, starting with the *least* significant bit of the first byte: `b"\xf2\x41\xc0\x4f\x0d\x00\x5a\xf6"`, with potential alternative representations of the same bytes: `b"\xf2A\xc0O\r\x00Z\xf6"` (ASCII-fied where possible), or `8kHATw0AWvY=` (base64), or `uproot decadence slowdown document ancient adroitness enlist vocalist` (PGP wordlist)
 
 ## TODOs
 
