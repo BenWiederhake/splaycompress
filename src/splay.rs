@@ -58,9 +58,10 @@ pub trait NodeArena<T: Clone + Copy + Debug + Eq + PartialEq>: Debug {
 
 #[derive(Debug)]
 pub struct Arena8 {
+    // Exploit the fact that "255" is such a small number, and try to fit all data on the stack.
     internal_nodes: [Node<u8>; u8::MAX as usize],
     // A leaf is always "right before" its corresponding internal node, if any.
-    // That must be this way around, because there is a leaf 255 but no internal node 255. (Or 65535.)
+    // That must be this way around, because there is a leaf 255 but no internal node 255.
     root: u8,
 }
 
@@ -118,6 +119,74 @@ impl NodeArena<u8> for Arena8 {
 
     fn is_consistent(&self) -> bool {
         self.is_subtree_consistent(self.root, 0, u8::MAX)
+    }
+}
+
+#[derive(Debug)]
+pub struct Arena16 {
+    // Sadly, a [Node<u16>; u16::MAX] would be 255.9 KiB, which is too large for the stack. Therefore, allocate it on the heap.
+    internal_nodes: Vec<Node<u16>>,
+    // A leaf is always "right before" its corresponding internal node, if any.
+    // That must be this way around, because there is a leaf 65535 but no internal node 65535.
+    root: u16,
+}
+
+impl Arena16 {
+    pub fn new_uniform() -> Self {
+        let mut nodes = Vec::with_capacity(u16::MAX as usize);
+        for i in 0..u16::MAX as usize {
+            let level = i.trailing_ones();
+            assert!(level < u16::BITS);
+            let ibu = i as u16;
+            let to_add = if level == 0 {
+                Node {
+                    left: NodeRef::new_leaf(ibu),
+                    right: NodeRef::new_leaf(ibu + 1),
+                }
+            } else {
+                let masked = ibu & !(1 << (level - 1));
+                let added_bit = 1 << level;
+                Node {
+                    left: NodeRef::new_internal(masked, u16::MAX),
+                    right: NodeRef::new_internal(masked | added_bit, u16::MAX),
+                }
+            };
+            nodes.push(to_add);
+        }
+        Self {
+            internal_nodes: nodes,
+            root: u16::MAX / 2,
+        }
+    }
+}
+
+impl NodeArena<u16> for Arena16 {
+    fn node(&self, internal_id: u16) -> &Node<u16> {
+        &self.internal_nodes[internal_id as usize]
+    }
+
+    fn node_mut(&mut self, internal_id: u16) -> &mut Node<u16> {
+        &mut self.internal_nodes[internal_id as usize]
+    }
+
+    fn root_idx(&self) -> NodeRef<u16> {
+        NodeRef::new_internal(self.root, u16::MAX)
+    }
+
+    fn root_idx_mut(&mut self) -> &mut u16 {
+        &mut self.root
+    }
+
+    fn ref_internal(&self, internal_id: u16) -> NodeRef<u16> {
+        NodeRef::new_internal(internal_id, u16::MAX)
+    }
+
+    fn incr(&self, v: u16) -> u16 {
+        v + 1
+    }
+
+    fn is_consistent(&self) -> bool {
+        self.is_subtree_consistent(self.root, 0, u16::MAX)
     }
 }
 
@@ -817,6 +886,186 @@ mod tests {
             walker.splay_parent_of_leaf();
         }
         assert_eq!(tree.root, 0b1001_1100);
+        assert!(tree.is_consistent());
+    }
+
+    #[test]
+    fn test16_uniform_is_consistent() {
+        let tree = Arena16::new_uniform();
+        // eprintln!("{tree:?}");
+        assert!(tree.is_consistent());
+    }
+
+    #[test]
+    fn test16_tree_structure() {
+        let tree = Arena16::new_uniform();
+        assert_eq!(tree.root, 32767);
+        assert_eq!(tree.internal_nodes[0].left, NodeRef::new_leaf(0));
+        assert_eq!(tree.internal_nodes[0].right, NodeRef::new_leaf(1));
+        assert_eq!(
+            tree.internal_nodes[1].left,
+            NodeRef::new_internal(0, u16::MAX)
+        );
+        assert_eq!(
+            tree.internal_nodes[1].right,
+            NodeRef::new_internal(2, u16::MAX)
+        );
+        assert_eq!(tree.internal_nodes[2].left, NodeRef::new_leaf(2));
+        assert_eq!(tree.internal_nodes[2].right, NodeRef::new_leaf(3));
+        assert_eq!(
+            tree.internal_nodes[3].left,
+            NodeRef::new_internal(1, u16::MAX)
+        );
+        assert_eq!(
+            tree.internal_nodes[3].right,
+            NodeRef::new_internal(5, u16::MAX)
+        );
+        assert_eq!(tree.internal_nodes[4].left, NodeRef::new_leaf(4));
+        assert_eq!(tree.internal_nodes[4].right, NodeRef::new_leaf(5));
+        assert_eq!(
+            tree.internal_nodes[5].left,
+            NodeRef::new_internal(4, u16::MAX)
+        );
+        assert_eq!(
+            tree.internal_nodes[5].right,
+            NodeRef::new_internal(6, u16::MAX)
+        );
+        assert_eq!(tree.internal_nodes[6].left, NodeRef::new_leaf(6));
+        assert_eq!(tree.internal_nodes[6].right, NodeRef::new_leaf(7));
+    }
+
+    #[test]
+    fn test16_go_basic() {
+        let mut tree = Arena16::new_uniform();
+        let mut walker = tree.splayable_mut(); // [0x0000, 0x10000]
+        assert_eq!(0x7FFF, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        assert_eq!(0x7FFF, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+
+        walker.go(Direction::Right); // [0x8000, 0x10000]
+        assert_eq!(0xBFFF, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Left); // [0x8000, 0xC000]
+        assert_eq!(0x9FFF, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Right); // [0xA000, 0xC000]
+        assert_eq!(0xAFFF, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Left); // [0xA000, 0xB000]
+        assert_eq!(0xA7FF, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+
+        walker.go(Direction::Right); // [0xA800, 0xB000]
+        assert_eq!(0xABFF, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Left); // [0xA800, 0xAC00]
+        assert_eq!(0xA9FF, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Right); // [0xAA00, 0xAC00]
+        assert_eq!(0xAAFF, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Left); // [0xAA00, 0xAB00]
+        assert_eq!(0xAA7F, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+
+        walker.go(Direction::Right); // [0xAA80, 0xAB00]
+        assert_eq!(0xAABF, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Left); // [0xAA80, 0xAAC0]
+        assert_eq!(0xAA9F, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Right); // [0xAAA0, 0xAAC0]
+        assert_eq!(0xAAAF, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Left); // [0xAAA0, 0xAAB0]
+        assert_eq!(0xAAA7, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+
+        walker.go(Direction::Right); // [0xAAA8, 0xAAAB]
+        assert_eq!(0xAAAB, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Left); // [0xAAA8, 0xAAAC]
+        assert_eq!(0xAAA9, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Right); // [0xAAAA, 0xAAAC]
+        assert_eq!(0xAAAA, walker.current_value());
+        assert_eq!(false, walker.is_leaf());
+        walker.go(Direction::Left); // [0xAAAA, 0xAAAB]
+        assert_eq!(0xAAAA, walker.current_value());
+        assert_eq!(true, walker.is_leaf());
+    }
+
+    #[test]
+    fn test16_splay_noop() {
+        let mut tree = Arena16::new_uniform();
+        assert_eq!(tree.root, 0x7FFF);
+        assert_eq!(
+            tree.internal_nodes[0x7FFF].left,
+            NodeRef::new_internal(0x3FFF, u16::MAX)
+        );
+        assert_eq!(
+            tree.internal_nodes[0x7FFF].right,
+            NodeRef::new_internal(0xBFFF, u16::MAX)
+        );
+        {
+            let mut walker = tree.splayable_mut();
+            walker.splay_internal();
+        }
+        assert_eq!(tree.root, 0x7FFF);
+        assert_eq!(
+            tree.internal_nodes[0x7FFF].left,
+            NodeRef::new_internal(0x3FFF, u16::MAX)
+        );
+        assert_eq!(
+            tree.internal_nodes[0x7FFF].right,
+            NodeRef::new_internal(0xBFFF, u16::MAX)
+        );
+        assert!(tree.is_consistent());
+    }
+
+    #[test]
+    fn test16_splay_zig_left() {
+        let mut tree = Arena16::new_uniform();
+        assert_eq!(tree.root, 0x7FFF);
+        assert_eq!(
+            tree.internal_nodes[0x7FFF].left,
+            NodeRef::new_internal(0x3FFF, u16::MAX)
+        );
+        assert_eq!(
+            tree.internal_nodes[0x7FFF].right,
+            NodeRef::new_internal(0xBFFF, u16::MAX)
+        );
+        assert_eq!(
+            tree.internal_nodes[0x3FFF].left,
+            NodeRef::new_internal(0x1FFF, u16::MAX)
+        );
+        assert_eq!(
+            tree.internal_nodes[0x3FFF].right,
+            NodeRef::new_internal(0x5FFF, u16::MAX)
+        );
+        {
+            let mut walker = tree.splayable_mut();
+            walker.go(Direction::Left);
+            walker.splay_internal();
+        }
+        assert_eq!(tree.root, 0x3FFF);
+        assert_eq!(
+            tree.internal_nodes[0x3FFF].left,
+            NodeRef::new_internal(0x1FFF, u16::MAX)
+        );
+        assert_eq!(
+            tree.internal_nodes[0x3FFF].right,
+            NodeRef::new_internal(0x7FFF, u16::MAX)
+        );
+        assert_eq!(
+            tree.internal_nodes[0x7FFF].left,
+            NodeRef::new_internal(0x5FFF, u16::MAX)
+        );
+        assert_eq!(
+            tree.internal_nodes[0x7FFF].right,
+            NodeRef::new_internal(0xBFFF, u16::MAX)
+        );
         assert!(tree.is_consistent());
     }
 }
