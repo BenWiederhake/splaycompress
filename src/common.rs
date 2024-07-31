@@ -169,4 +169,18 @@ mod tests {
     fn test_ref_internal_overflow_u16() {
         NodeRef::<u16>::new_internal(u16::MAX, u16::MAX);
     }
+
+    #[test]
+    fn test_dir_roundtrip() {
+        assert_eq!(
+            Direction::Right,
+            Direction::from_bit(Direction::Right.to_bit())
+        );
+        assert_eq!(
+            Direction::Left,
+            Direction::from_bit(Direction::Left.to_bit())
+        );
+        assert!(Direction::from_bit(true).to_bit());
+        assert!(!Direction::from_bit(false).to_bit());
+    }
 }

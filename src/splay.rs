@@ -819,18 +819,4 @@ mod tests {
         assert_eq!(tree.root, 0b1001_1100);
         assert!(tree.is_consistent());
     }
-
-    #[test]
-    fn test_dir_roundtrip() {
-        assert_eq!(
-            Direction::Right,
-            Direction::from_bit(Direction::Right.to_bit())
-        );
-        assert_eq!(
-            Direction::Left,
-            Direction::from_bit(Direction::Left.to_bit())
-        );
-        assert!(Direction::from_bit(true).to_bit());
-        assert!(!Direction::from_bit(false).to_bit());
-    }
 }
