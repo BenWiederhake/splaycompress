@@ -2,19 +2,10 @@ mod bits;
 mod splay;
 
 use bits::{BitReader, BitWriter};
-use clap::Parser;
 use splay::{Direction, SplayTree};
-use std::io::{stdin, stdout, ErrorKind, Read, Result, Write};
+use std::io::{ErrorKind, Read, Result, Write};
 
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-struct Args {
-    /// Whether to decompress instead of compress.
-    #[arg(short, long)]
-    decompress: bool,
-}
-
-fn compress<R: Read, W: Write>(mut r: R, w: W) -> Result<()> {
+pub fn compress<R: Read, W: Write>(mut r: R, w: W) -> Result<()> {
     let mut tree = SplayTree::new_uniform();
     let mut walker = tree.splayable_mut();
     let mut writer = BitWriter::new(w);
@@ -55,7 +46,7 @@ fn compress<R: Read, W: Write>(mut r: R, w: W) -> Result<()> {
     writer.flush()
 }
 
-fn decompress<R: Read, W: Write>(r: R, mut w: W) -> Result<()> {
+pub fn decompress<R: Read, W: Write>(r: R, mut w: W) -> Result<()> {
     let mut tree = SplayTree::new_uniform();
     let mut walker = tree.splayable_mut();
     let mut reader = BitReader::new(r);
@@ -76,17 +67,6 @@ fn decompress<R: Read, W: Write>(r: R, mut w: W) -> Result<()> {
             walker.splay_parent_of_leaf();
             debug_assert!(walker.is_consistent());
         }
-    }
-}
-
-fn main() -> Result<()> {
-    let r = stdin().lock();
-    let w = stdout().lock();
-    let args = Args::parse();
-    if args.decompress {
-        decompress(r, w)
-    } else {
-        compress(r, w)
     }
 }
 
