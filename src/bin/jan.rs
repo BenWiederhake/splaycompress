@@ -10,7 +10,7 @@ struct Args {
     #[arg(short, long)]
     decompress: bool,
 
-    /// Flavor of the algorithm to use. Defaults to 8bit which is many times faster but slightly worse at compressing.
+    /// Flavor of the algorithm to use. Defaults to bit8 which is many times faster but slightly worse at compressing.
     #[clap(value_enum)]
     #[arg(short, long, default_value = "bit8")]
     flavor: CLIFlavor,
