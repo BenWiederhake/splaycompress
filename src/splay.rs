@@ -31,12 +31,6 @@ impl NodeRef {
     }
 }
 
-#[derive(Debug)]
-struct Node {
-    left: NodeRef,
-    right: NodeRef,
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Direction {
     Left,
@@ -63,6 +57,12 @@ impl Direction {
     pub fn to_bit(&self) -> bool {
         self == &Direction::Right
     }
+}
+
+#[derive(Debug)]
+struct Node {
+    left: NodeRef,
+    right: NodeRef,
 }
 
 impl Node {
