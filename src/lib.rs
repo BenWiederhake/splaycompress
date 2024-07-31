@@ -1,8 +1,10 @@
 mod bits;
+mod common;
 mod splay;
 
 use bits::{BitReader, BitWriter};
-use splay::{Direction, SplayTree};
+use common::Direction;
+use splay::SplayTree;
 use std::io::{ErrorKind, Read, Result, Write};
 
 pub fn compress<R: Read, W: Write>(mut r: R, w: W) -> Result<()> {
