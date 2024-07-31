@@ -1,16 +1,71 @@
 use crate::common::{Direction, Node, NodeRef};
 use std::array::from_fn;
+use std::cmp::PartialOrd;
+use std::fmt::Debug;
+
+pub trait NodeArena<T: Clone + Copy + Debug + Eq + PartialEq>: Debug {
+    fn node(&self, internal_id: T) -> &Node<T>;
+    fn node_mut(&mut self, internal_id: T) -> &mut Node<T>;
+    fn root_idx(&self) -> NodeRef<T>;
+    fn root_idx_mut(&mut self) -> &mut T;
+    fn ref_internal(&self, internal_id: T) -> NodeRef<T>;
+
+    fn is_consistent(&self) -> bool;
+    // TODO: 'incr' is an ugly wart, but sadly there's just no good way to express the concept "u8 or u16".
+    fn incr(&self, v: T) -> T;
+
+    fn is_subtree_consistent(&self, root_index: T, cover_min: T, cover_max_incl: T) -> bool
+    where
+        T: PartialOrd,
+    {
+        let node = &self.node(root_index);
+        // eprintln!("ENTER internal node {root_index}={node:?} cover_min={cover_min}, cover_max_incl={cover_max_incl}");
+        let index_consistent = cover_min <= root_index && root_index < cover_max_incl;
+        if !index_consistent {
+            eprintln!(
+                "internal node {root_index:?} not consistent: cover_min={cover_min:?}, cover_max_incl={cover_max_incl:?}"
+            );
+        }
+        let left_consistent = self.is_arm_consistent(&node.left, cover_min, root_index);
+        let right_consistent =
+            self.is_arm_consistent(&node.right, self.incr(root_index), cover_max_incl);
+        if !left_consistent || !right_consistent {
+            eprintln!(
+                "internal node {root_index:?} has inconsistent arms: cover_min={cover_min:?}, cover_max_incl={cover_max_incl:?}"
+            );
+        }
+        //eprintln!("EXIT internal node {root_index} cover_min={cover_min}, cover_max_incl={cover_max_incl}");
+        index_consistent && left_consistent && right_consistent
+    }
+
+    fn is_arm_consistent(&self, root: &NodeRef<T>, cover_min: T, cover_max_incl: T) -> bool
+    where
+        T: PartialOrd,
+    {
+        if let Some(child_index) = root.as_internal() {
+            return self.is_subtree_consistent(child_index, cover_min, cover_max_incl);
+        }
+        if let Some(leaf_index) = root.as_leaf() {
+            return cover_min == leaf_index && leaf_index == cover_max_incl;
+        }
+        panic!("empty child?!")
+    }
+
+    fn splayable_mut(&mut self) -> Splayable<'_, T, Self> {
+        Splayable::new(self)
+    }
+}
 
 #[derive(Debug)]
-pub struct SplayTree {
+pub struct Arena8 {
     internal_nodes: [Node<u8>; u8::MAX as usize],
     // A leaf is always "right before" its corresponding internal node, if any.
     // That must be this way around, because there is a leaf 255 but no internal node 255. (Or 65535.)
     root: u8,
 }
 
-impl SplayTree {
-    pub fn new_uniform() -> SplayTree {
+impl Arena8 {
+    pub fn new_uniform() -> Self {
         let nodes: [Node<u8>; u8::MAX as usize] = from_fn(|i| {
             let level = i.trailing_ones();
             assert!(level < u8::BITS);
@@ -29,70 +84,61 @@ impl SplayTree {
                 }
             }
         });
-        SplayTree {
+        Self {
             internal_nodes: nodes,
             root: u8::MAX / 2,
         }
+    }
+}
+
+impl NodeArena<u8> for Arena8 {
+    fn node(&self, internal_id: u8) -> &Node<u8> {
+        &self.internal_nodes[internal_id as usize]
+    }
+
+    fn node_mut(&mut self, internal_id: u8) -> &mut Node<u8> {
+        &mut self.internal_nodes[internal_id as usize]
+    }
+
+    fn root_idx(&self) -> NodeRef<u8> {
+        NodeRef::new_internal(self.root, u8::MAX)
+    }
+
+    fn root_idx_mut(&mut self) -> &mut u8 {
+        &mut self.root
+    }
+
+    fn ref_internal(&self, internal_id: u8) -> NodeRef<u8> {
+        NodeRef::new_internal(internal_id, u8::MAX)
+    }
+
+    fn incr(&self, v: u8) -> u8 {
+        v + 1
     }
 
     fn is_consistent(&self) -> bool {
         self.is_subtree_consistent(self.root, 0, u8::MAX)
     }
-
-    fn is_subtree_consistent(&self, root_index: u8, cover_min: u8, cover_max_incl: u8) -> bool {
-        let node = &self.internal_nodes[root_index as usize];
-        // eprintln!("ENTER internal node {root_index}={node:?} cover_min={cover_min}, cover_max_incl={cover_max_incl}");
-        let index_consistent = cover_min <= root_index && root_index < cover_max_incl;
-        if !index_consistent {
-            eprintln!(
-                "internal node {root_index} not consistent: cover_min={cover_min}, cover_max_incl={cover_max_incl}"
-            );
-        }
-        let left_consistent = self.is_arm_consistent(&node.left, cover_min, root_index);
-        let right_consistent = self.is_arm_consistent(&node.right, root_index + 1, cover_max_incl);
-        if !left_consistent || !right_consistent {
-            eprintln!(
-                "internal node {root_index} has inconsistent arms: cover_min={cover_min}, cover_max_incl={cover_max_incl}"
-            );
-        }
-        //eprintln!("EXIT internal node {root_index} cover_min={cover_min}, cover_max_incl={cover_max_incl}");
-        index_consistent && left_consistent && right_consistent
-    }
-
-    fn is_arm_consistent(&self, root: &NodeRef<u8>, cover_min: u8, cover_max_incl: u8) -> bool {
-        if let Some(child_index) = root.as_internal() {
-            return self.is_subtree_consistent(child_index, cover_min, cover_max_incl);
-        }
-        if let Some(leaf_index) = root.as_leaf() {
-            return cover_min == leaf_index && leaf_index == cover_max_incl;
-        }
-        panic!("empty child?!")
-    }
-
-    pub fn splayable_mut(&mut self) -> Splayable {
-        Splayable::new(self)
-    }
 }
 
 #[derive(Debug)]
-pub struct Splayable<'a> {
-    tree: &'a mut SplayTree,
-    node: NodeRef<u8>,
-    // TODO: This should live in SplayTree, not here, for memory allocation purposes.
-    internal_parents: Vec<(u8, Direction)>,
+pub struct Splayable<'a, T: Clone + Copy + Debug + Eq + PartialEq, A: NodeArena<T> + ?Sized> {
+    arena: &'a mut A,
+    node: NodeRef<T>,
+    internal_parents: Vec<(T, Direction)>,
 }
 
-impl<'a> Splayable<'a> {
-    fn new(tree: &'a mut SplayTree) -> Self {
-        let node = NodeRef::new_internal(tree.root, u8::MAX);
+impl<'a, T: Clone + Copy + Debug + Eq + PartialEq, A: NodeArena<T> + ?Sized> Splayable<'a, T, A> {
+    fn new(arena: &'a mut A) -> Self {
+        let node = arena.root_idx();
         Self {
-            tree,
+            arena,
             node,
-            internal_parents: Vec::with_capacity((u8::BITS as usize) * 2),
+            internal_parents: Vec::with_capacity(std::mem::size_of::<T>() * 2),
         }
     }
 
-    pub fn current_value(&self) -> u8 {
+    pub fn current_value(&self) -> T {
         match self.node {
             NodeRef::Internal(v) => v,
             NodeRef::Leaf(v) => v,
@@ -113,11 +159,11 @@ impl<'a> Splayable<'a> {
             _ => panic!("Tried to descend on leaf?!"),
         };
         self.internal_parents.push((node_id, dir));
-        let node = &self.tree.internal_nodes[node_id as usize];
+        let node = &self.arena.node(node_id);
         self.node = node.arm(dir);
     }
 
-    pub fn find_deep_internal(&self, min_length: usize) -> u8 {
+    pub fn find_deep_internal(&self, min_length: usize) -> T {
         assert!(self.is_root());
         assert!(!self.is_leaf());
         let mut level = 0;
@@ -127,7 +173,7 @@ impl<'a> Splayable<'a> {
             assert!(!candidates.is_empty());
             let mut next_candidates = Vec::with_capacity(candidates.len() * 2);
             for candidate_id in &candidates {
-                let node = &self.tree.internal_nodes[*candidate_id as usize];
+                let node = &self.arena.node(*candidate_id);
                 for d in [Direction::Left, Direction::Right] {
                     let noderef = node.arm(d);
                     if let Some(child_id) = noderef.as_internal() {
@@ -142,12 +188,14 @@ impl<'a> Splayable<'a> {
     }
 
     pub fn is_consistent(&self) -> bool {
-        self.tree.is_consistent()
+        self.arena.is_consistent()
     }
 
     pub fn splay_parent_of_leaf(&mut self) {
         assert!(self.is_leaf());
-        self.node = NodeRef::new_internal(self.internal_parents.pop().unwrap().0, u8::MAX);
+        self.node = self
+            .arena
+            .ref_internal(self.internal_parents.pop().unwrap().0);
         self.splay_internal();
     }
 
@@ -159,30 +207,27 @@ impl<'a> Splayable<'a> {
                 .internal_parents
                 .pop()
                 .expect("length should be >= 2?!");
-            assert_eq!(
-                self.tree.internal_nodes[parent_id as usize].arm(parent_dir),
-                self.node
-            );
+            assert_eq!(self.arena.node(parent_id).arm(parent_dir), self.node);
             let (grandparent_id, grandparent_dir) = self
                 .internal_parents
                 .pop()
                 .expect("length should be >= 2?!");
             assert_eq!(
-                self.tree.internal_nodes[grandparent_id as usize].arm(grandparent_dir),
-                NodeRef::new_internal(parent_id, u8::MAX)
+                self.arena.node(grandparent_id).arm(grandparent_dir),
+                self.arena.ref_internal(parent_id)
             );
 
             // We're about to replace grandparent by node, so first update the pointer to grandparent:
             if let Some(&(ggp_id, ggp_dir)) = self.internal_parents.last() {
                 assert_eq!(
-                    self.tree.internal_nodes[ggp_id as usize].arm(ggp_dir),
-                    NodeRef::new_internal(grandparent_id, u8::MAX)
+                    self.arena.node(ggp_id).arm(ggp_dir),
+                    self.arena.ref_internal(grandparent_id)
                 );
                 // -1 ref to grandparent, +1 ref to self.node
-                *self.tree.internal_nodes[ggp_id as usize].arm_mut(ggp_dir) = self.node;
+                *self.arena.node_mut(ggp_id).arm_mut(ggp_dir) = self.node;
             } else {
                 // -1 ref to grandparent, +1 ref to self.node
-                self.tree.root = node_id;
+                *self.arena.root_idx_mut() = node_id;
             }
 
             if grandparent_dir == parent_dir {
@@ -198,21 +243,20 @@ impl<'a> Splayable<'a> {
                 //     P           d
                 //  G     c
                 // a b
-                let subtree_b =
-                    self.tree.internal_nodes[parent_id as usize].arm(parent_dir.opposite());
-                let subtree_c =
-                    self.tree.internal_nodes[node_id as usize].arm(parent_dir.opposite());
+                let subtree_b = self.arena.node(parent_id).arm(parent_dir.opposite());
+                let subtree_c = self.arena.node(node_id).arm(parent_dir.opposite());
                 // -1 ref to 'subtree_b', +1 ref to grandparent
-                *self.tree.internal_nodes[parent_id as usize].arm_mut(parent_dir.opposite()) =
-                    NodeRef::new_internal(grandparent_id, u8::MAX);
+                *self
+                    .arena
+                    .node_mut(parent_id)
+                    .arm_mut(parent_dir.opposite()) = self.arena.ref_internal(grandparent_id);
                 // -1 ref to parent, +1 ref to 'subtree_b'
-                *self.tree.internal_nodes[grandparent_id as usize].arm_mut(grandparent_dir) =
-                    subtree_b;
+                *self.arena.node_mut(grandparent_id).arm_mut(grandparent_dir) = subtree_b;
                 // -1 ref to 'subtree_c', +1 ref to parent
-                *self.tree.internal_nodes[node_id as usize].arm_mut(parent_dir.opposite()) =
-                    NodeRef::new_internal(parent_id, u8::MAX);
+                *self.arena.node_mut(node_id).arm_mut(parent_dir.opposite()) =
+                    self.arena.ref_internal(parent_id);
                 // -1 ref to self.node +1 ref to 'subtree_c'
-                *self.tree.internal_nodes[parent_id as usize].arm_mut(parent_dir) = subtree_c;
+                *self.arena.node_mut(parent_id).arm_mut(parent_dir) = subtree_c;
                 // Should be consistent again.
             } else {
                 // println!("Doing zigzag gp_dir={grandparent_dir:?} p_dir={parent_dir:?}");
@@ -227,19 +271,18 @@ impl<'a> Splayable<'a> {
                 //           N
                 //     G           P
                 //  a     b     c     d
-                let subtree_b = self.tree.internal_nodes[node_id as usize].arm(parent_dir);
-                let subtree_c = self.tree.internal_nodes[node_id as usize].arm(grandparent_dir);
+                let subtree_b = self.arena.node(node_id).arm(parent_dir);
+                let subtree_c = self.arena.node(node_id).arm(grandparent_dir);
                 // -1 ref to 'subtree_b', +1 ref to grandparent
-                *self.tree.internal_nodes[node_id as usize].arm_mut(parent_dir) =
-                    NodeRef::new_internal(grandparent_id, u8::MAX);
+                *self.arena.node_mut(node_id).arm_mut(parent_dir) =
+                    self.arena.ref_internal(grandparent_id);
                 // -1 ref to parent, +1 ref to 'subtree_b'
-                *self.tree.internal_nodes[grandparent_id as usize].arm_mut(grandparent_dir) =
-                    subtree_b;
+                *self.arena.node_mut(grandparent_id).arm_mut(grandparent_dir) = subtree_b;
                 // -1 ref to 'subtree_c', +1 ref to parent
-                *self.tree.internal_nodes[node_id as usize].arm_mut(grandparent_dir) =
-                    NodeRef::new_internal(parent_id, u8::MAX);
+                *self.arena.node_mut(node_id).arm_mut(grandparent_dir) =
+                    self.arena.ref_internal(parent_id);
                 // -1 ref to self.node +1 ref to 'subtree_c'
-                *self.tree.internal_nodes[parent_id as usize].arm_mut(parent_dir) = subtree_c;
+                *self.arena.node_mut(parent_id).arm_mut(parent_dir) = subtree_c;
                 // Should be consistent again.
             }
         }
@@ -259,22 +302,19 @@ impl<'a> Splayable<'a> {
                 .expect("length should be == 1?!");
             // println!("Doing zig p_dir={parent_dir:?}");
             assert!(self.internal_parents.is_empty());
-            assert_eq!(
-                self.tree.internal_nodes[parent_id as usize].arm(parent_dir),
-                self.node
-            );
-            assert_eq!(parent_id, self.tree.root);
+            assert_eq!(self.arena.node(parent_id).arm(parent_dir), self.node);
+            assert_eq!(Some(parent_id), self.arena.root_idx().as_internal());
 
             // We're about to replace root == parent, so first update that pointer:
             // -1 ref to parent, +1 ref to self.node
-            self.tree.root = node_id;
+            *self.arena.root_idx_mut() = node_id;
 
-            let subtree_b = self.tree.internal_nodes[node_id as usize].arm(parent_dir.opposite());
+            let subtree_b = self.arena.node(node_id).arm(parent_dir.opposite());
             // -1 ref to 'subtree_b', +1 ref to parent
-            *self.tree.internal_nodes[node_id as usize].arm_mut(parent_dir.opposite()) =
-                NodeRef::new_internal(parent_id, u8::MAX);
+            *self.arena.node_mut(node_id).arm_mut(parent_dir.opposite()) =
+                self.arena.ref_internal(parent_id);
             // -1 ref to self.node, +1 ref to 'subtree_b'
-            *self.tree.internal_nodes[parent_id as usize].arm_mut(parent_dir) = subtree_b;
+            *self.arena.node_mut(parent_id).arm_mut(parent_dir) = subtree_b;
             // Should be consistent again.
         }
         assert!(self.internal_parents.is_empty());
@@ -287,14 +327,14 @@ mod tests {
 
     #[test]
     fn test_uniform_is_consistent() {
-        let tree = SplayTree::new_uniform();
+        let tree = Arena8::new_uniform();
         // eprintln!("{tree:?}");
         assert!(tree.is_consistent());
     }
 
     #[test]
     fn test_tree_structure() {
-        let tree = SplayTree::new_uniform();
+        let tree = Arena8::new_uniform();
         assert_eq!(tree.root, 127);
         assert_eq!(tree.internal_nodes[0].left, NodeRef::new_leaf(0));
         assert_eq!(tree.internal_nodes[0].right, NodeRef::new_leaf(1));
@@ -332,7 +372,7 @@ mod tests {
 
     #[test]
     fn test_go_basic() {
-        let mut tree = SplayTree::new_uniform();
+        let mut tree = Arena8::new_uniform();
         let mut walker = tree.splayable_mut(); // [0, 255]
         assert_eq!(127, walker.current_value());
         assert_eq!(false, walker.is_leaf());
@@ -366,7 +406,7 @@ mod tests {
 
     #[test]
     fn test_splay_noop() {
-        let mut tree = SplayTree::new_uniform();
+        let mut tree = Arena8::new_uniform();
         assert_eq!(tree.root, 127);
         assert_eq!(
             tree.internal_nodes[127].left,
@@ -394,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_splay_zig_left() {
-        let mut tree = SplayTree::new_uniform();
+        let mut tree = Arena8::new_uniform();
         assert_eq!(tree.root, 127);
         assert_eq!(
             tree.internal_nodes[127].left,
@@ -439,7 +479,7 @@ mod tests {
 
     #[test]
     fn test_splay_zig_right() {
-        let mut tree = SplayTree::new_uniform();
+        let mut tree = Arena8::new_uniform();
         assert_eq!(tree.root, 127);
         assert_eq!(
             tree.internal_nodes[127].left,
@@ -484,7 +524,7 @@ mod tests {
 
     #[test]
     fn test_splay_zigzig_left() {
-        let mut tree = SplayTree::new_uniform();
+        let mut tree = Arena8::new_uniform();
         assert_eq!(tree.root, 0x7f);
         assert_eq!(
             tree.internal_nodes[0x7f].left,
@@ -546,7 +586,7 @@ mod tests {
 
     #[test]
     fn test_splay_zigzig_right() {
-        let mut tree = SplayTree::new_uniform();
+        let mut tree = Arena8::new_uniform();
         assert_eq!(tree.root, 0x7f);
         assert_eq!(
             tree.internal_nodes[0x7f].left,
@@ -608,7 +648,7 @@ mod tests {
 
     #[test]
     fn test_splay_zigzag_rightleft() {
-        let mut tree = SplayTree::new_uniform();
+        let mut tree = Arena8::new_uniform();
         assert_eq!(tree.root, 0x7f);
         assert_eq!(
             tree.internal_nodes[0x7f].left,
@@ -670,7 +710,7 @@ mod tests {
 
     #[test]
     fn test_splay_zigzag_leftright() {
-        let mut tree = SplayTree::new_uniform();
+        let mut tree = Arena8::new_uniform();
         assert_eq!(tree.root, 0x7f);
         assert_eq!(
             tree.internal_nodes[0x7f].left,
@@ -732,7 +772,7 @@ mod tests {
 
     #[test]
     fn test_splay_zigzig_zigzag_zig() {
-        let mut tree = SplayTree::new_uniform();
+        let mut tree = Arena8::new_uniform();
         {
             let mut walker = tree.splayable_mut(); // [0, 255]
             walker.go(Direction::Left);
@@ -748,7 +788,7 @@ mod tests {
 
     #[test]
     fn test_splay_zigzag_zigzig() {
-        let mut tree = SplayTree::new_uniform();
+        let mut tree = Arena8::new_uniform();
         {
             let mut walker = tree.splayable_mut(); // [0, 255]
             walker.go(Direction::Right);
@@ -763,7 +803,7 @@ mod tests {
 
     #[test]
     fn test_splay_leaf() {
-        let mut tree = SplayTree::new_uniform();
+        let mut tree = Arena8::new_uniform();
         {
             let mut walker = tree.splayable_mut(); // [0, 255]
             walker.go(Direction::Right);

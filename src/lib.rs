@@ -4,11 +4,11 @@ mod splay;
 
 use bits::{BitReader, BitWriter};
 use common::Direction;
-use splay::SplayTree;
+use splay::{Arena8, NodeArena};
 use std::io::{ErrorKind, Read, Result, Write};
 
 pub fn compress<R: Read, W: Write>(mut r: R, w: W) -> Result<()> {
-    let mut tree = SplayTree::new_uniform();
+    let mut tree = Arena8::new_uniform();
     let mut walker = tree.splayable_mut();
     let mut writer = BitWriter::new(w);
     loop {
@@ -49,7 +49,7 @@ pub fn compress<R: Read, W: Write>(mut r: R, w: W) -> Result<()> {
 }
 
 pub fn decompress<R: Read, W: Write>(r: R, mut w: W) -> Result<()> {
-    let mut tree = SplayTree::new_uniform();
+    let mut tree = Arena8::new_uniform();
     let mut walker = tree.splayable_mut();
     let mut reader = BitReader::new(r);
     loop {
