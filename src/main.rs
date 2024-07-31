@@ -83,9 +83,10 @@ fn main() -> Result<()> {
     let r = stdin().lock();
     let w = stdout().lock();
     let args = Args::parse();
-    match args.decompress {
-        false => compress(r, w),
-        true => decompress(r, w),
+    if args.decompress {
+        decompress(r, w)
+    } else {
+        compress(r, w)
     }
 }
 
