@@ -54,8 +54,8 @@ impl Direction {
     }
 
     #[allow(dead_code)]
-    pub fn to_bit(&self) -> bool {
-        self == &Direction::Right
+    pub fn to_bit(self) -> bool {
+        self == Direction::Right
     }
 }
 
