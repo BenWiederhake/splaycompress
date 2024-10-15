@@ -20,7 +20,7 @@ use symbol::{
 ///
 /// Alternate representations: b"\xb3\xa9\x14\x00\xb9l\r\xd8" or s6kUALlsDdg= or "scallion passenger
 /// baboon adroitness sentence handiwork ancient stupendous"
-pub const MAGIC_FORMAT_SYMBOL8: &'static [u8] = b"\xb3\xa9\x14\x00\xb9\x6c\x0d\xd8";
+pub const MAGIC_FORMAT_SYMBOL8: &[u8] = b"\xb3\xa9\x14\x00\xb9\x6c\x0d\xd8";
 
 /// Filemagic for "raw splaycompress data with 16-bit little-endian symbols, no metadata except this filemagic".
 /// I generated this by taking 6 random bytes, the NUL byte, and the '\\r' byte, and re-shuffling
@@ -29,7 +29,7 @@ pub const MAGIC_FORMAT_SYMBOL8: &'static [u8] = b"\xb3\xa9\x14\x00\xb9\x6c\x0d\x
 ///
 /// Alternate representations: b"\xf2A\xc0O\r\x00Z\xf6" or 8kHATw0AWvY= or "uproot decadence
 /// slowdown document ancient adroitness enlist vocalist"
-pub const MAGIC_FORMAT_SYMBOL16LE: &'static [u8] = b"\xf2\x41\xc0\x4f\x0d\x00\x5a\xf6";
+pub const MAGIC_FORMAT_SYMBOL16LE: &[u8] = b"\xf2\x41\xc0\x4f\x0d\x00\x5a\xf6";
 
 /// Filemagic for "raw splaycompress data with 16-bit big-endian symbols, no metadata except this filemagic".
 /// This is the reverse of `MAGIC_FORMAT_SYMBOL16LE`. This should provide a good
@@ -37,7 +37,7 @@ pub const MAGIC_FORMAT_SYMBOL16LE: &'static [u8] = b"\xf2\x41\xc0\x4f\x0d\x00\x5
 ///
 /// Alternate representations: b"\xf6Z\x00\rO\xc0A\xf2" or 9loADU/AQfI= or "village existence
 /// aardvark asteroid dropper recipe cranky vagabond"
-pub const MAGIC_FORMAT_SYMBOL16BE: &'static [u8] = b"\xf6\x5a\x00\x0d\x4f\xc0\x41\xf2";
+pub const MAGIC_FORMAT_SYMBOL16BE: &[u8] = b"\xf6\x5a\x00\x0d\x4f\xc0\x41\xf2";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Flavor {
