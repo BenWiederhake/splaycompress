@@ -33,8 +33,8 @@ fn main() {
         CLIFlavor::Bit16LE => Flavor::Symbol16LE,
     };
     if args.decompress {
-        compress(flavor, r, w).unwrap()
-    } else {
         decompress(flavor, r, w).unwrap()
+    } else {
+        compress(flavor, r, w).unwrap()
     }
 }
